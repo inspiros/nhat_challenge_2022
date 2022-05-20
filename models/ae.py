@@ -10,8 +10,12 @@ class AutoEncoder(nn.Module):
             nn.Linear(in_channels * num_joints, 64),
             nn.ReLU(inplace=True),
             nn.Linear(64, 128),
+            nn.ReLU(inplace=True),
+            nn.Linear(128, 256),
         )
         self.decoder = nn.Sequential(
+            nn.Linear(256, 128),
+            nn.ReLU(inplace=True),
             nn.Linear(128, 64),
             nn.ReLU(inplace=True),
             nn.Linear(64, out_channels * num_joints),

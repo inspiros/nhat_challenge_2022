@@ -81,8 +81,11 @@ def test(test_loader, model, metric, device='cpu'):
 def main():
     args = parse_args()
 
+    normalize = transforms.Lambda(lambda x: x / 500 - 1),  # [0, w] -> [-1, 1]
+    denormalize = transforms.Lambda(lambda x: (x + 1) * 500),  # [-1, 1] -> [0, w]
+
     transform = transforms.Compose([
-        transforms.Lambda(lambda x: x / 1000),  # frame normalize
+        normalize,
         transforms.Lambda(lambda x: x.permute(2, 0, 1)),  # [T, V, C] -> [C, T, V]
     ])
 
@@ -111,10 +114,7 @@ def main():
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=3, gamma=0.1)
 
     # evaluation metric
-    def metric(output, target):
-        output = output * 1000
-        target = target * 1000
-        return mpjpe(output, target, dim=1)
+    metric = lambda output, target: mpjpe(denormalize(output), denormalize(target), dim=1)
 
     # load previous states
     start_epoch = 0
