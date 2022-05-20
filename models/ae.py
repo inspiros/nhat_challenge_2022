@@ -7,14 +7,14 @@ class AutoEncoder(nn.Module):
     def __init__(self, in_channels, out_channels, num_joints=17):
         super(AutoEncoder, self).__init__()
         self.encoder = nn.Sequential(
-            nn.Linear(in_channels * num_joints, 16),
+            nn.Linear(in_channels * num_joints, 64),
             nn.ReLU(inplace=True),
-            nn.Linear(16, 8),
+            nn.Linear(64, 128),
         )
         self.decoder = nn.Sequential(
-            nn.Linear(8, 16),
+            nn.Linear(128, 64),
             nn.ReLU(inplace=True),
-            nn.Linear(16, out_channels * num_joints),
+            nn.Linear(64, out_channels * num_joints),
         )
 
     def forward(self, x):

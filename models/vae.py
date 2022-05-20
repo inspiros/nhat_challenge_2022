@@ -18,9 +18,9 @@ class VAE(nn.Module):
 
         self.encoder = nn.Sequential(
             nn.Linear(in_channels * num_joints, 64),
-            nn.LeakyReLU(0.2, inplace=True),
+            nn.ReLU(inplace=True),
             nn.Linear(64, 128),
-            nn.LeakyReLU(0.2, inplace=True),
+            nn.ReLU(inplace=True),
         )
 
         # hidden => mu
@@ -31,9 +31,9 @@ class VAE(nn.Module):
 
         self.decoder = nn.Sequential(
             nn.Linear(self.latent_dim, 128),
-            nn.LeakyReLU(0.2, inplace=True),
+            nn.ReLU(inplace=True),
             nn.Linear(128, 64),
-            nn.LeakyReLU(0.2, inplace=True),
+            nn.ReLU(inplace=True),
             nn.Linear(64, out_channels * num_joints),
         )
 
