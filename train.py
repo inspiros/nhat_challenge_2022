@@ -39,9 +39,8 @@ def train(train_loader, model, criterion, optimizer, device='cpu'):
     model.train()
 
     running_loss = 0.0
-    for batch_id, (X, Y) in enumerate(pbar := tqdm(train_loader,
-                                                   desc='[Training]',
-                                                   file=sys.stdout)):
+    pbar = tqdm(train_loader, desc='[Training]', file=sys.stdout)
+    for batch_id, (X, Y) in enumerate(pbar):
         X = X.to(device)
         Y = Y.to(device)
 
@@ -65,9 +64,8 @@ def test(test_loader, model, metric, device='cpu'):
     model.eval()
 
     running_metric = 0.0
-    for batch_id, (X, Y) in enumerate(pbar := tqdm(test_loader,
-                                                   desc='[Testing]',
-                                                   file=sys.stdout)):
+    pbar = tqdm(test_loader, desc='[Testing]', file=sys.stdout)
+    for batch_id, (X, Y) in enumerate(pbar):
         X = X.to(device)
         Y = Y.to(device)
 
