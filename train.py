@@ -92,8 +92,8 @@ def test(test_loader, model, metric, device='cpu'):
 def main():
     args = parse_args()
 
-    normalize = transforms.Lambda(lambda x: x / 500 - 1),  # [0, w] -> [-1, 1]
-    denormalize = transforms.Lambda(lambda x: (x + 1) * 500),  # [-1, 1] -> [0, w]
+    normalize = transforms.Lambda(lambda x: x / 500 - 1)  # [0, w] -> [-1, 1]
+    denormalize = transforms.Lambda(lambda x: (x + 1) * 500)  # [-1, 1] -> [0, w]
 
     transform = transforms.Compose([
         normalize,
