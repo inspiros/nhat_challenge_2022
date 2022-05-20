@@ -9,7 +9,7 @@ from tqdm import tqdm
 
 from datasets.h36m import H36MRestorationDataset
 from models.losses import *
-from models.vae import VAE
+from models.ae import AutoEncoder
 
 
 def parse_args():
@@ -46,8 +46,10 @@ def train(train_loader, model, criterion, optimizer, device='cpu'):
         Y = Y.to(device)
 
         optimizer.zero_grad()
-        Y_rec, mu, logvar = model(X)
-        loss = criterion(Y_rec, Y) + 0.1 * kld_loss(mu, logvar)
+        # Y_rec, mu, logvar = model(X)
+        # loss = criterion(Y_rec, Y) + 0.1 * kld_loss(mu, logvar)
+        Y_rec = model(X)
+        loss = criterion(Y_rec, Y)
         loss.backward()
         optimizer.step()
 
@@ -69,7 +71,7 @@ def test(test_loader, model, metric, device='cpu'):
         X = X.to(device)
         Y = Y.to(device)
 
-        Y_rec, mu, logvar = model(X)
+        Y_rec = model(X)
         metric_value = metric(Y_rec, Y)
 
         running_metric += metric_value.item() * X.size(0)
@@ -102,10 +104,10 @@ def main():
     train_loader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True)
     test_loader = DataLoader(test_set, batch_size=args.batch_size, shuffle=False)
 
-    model = VAE(in_channels=2,
-                out_channels=2,
-                num_joints=17,
-                latent_dim=20).to(args.device)
+    model = AutoEncoder(in_channels=2,
+                        out_channels=2,
+                        num_joints=17,
+                        ).to(args.device)
     criterion = MPJPELoss(dim=1)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=3, gamma=0.1)

@@ -31,7 +31,7 @@ def main():
 
     for batch_id, (X, Y) in enumerate(test_loader):
         print(X.shape, Y.shape)
-        print()
+        print(X)
 
 
 if __name__ == '__main__':
