@@ -17,8 +17,8 @@ def parse_args():
     parser.add_argument('--data_file', default='data/data_2d_h36m_gt.npz')
     parser.add_argument('--checkpoint_dir', default='checkpoints')
 
-    parser.add_argument('--batch_size', default=256)
-    parser.add_argument('--max_epoch', default=1)
+    parser.add_argument('--batch_size', type=int, default=256)
+    parser.add_argument('--max_epoch', type=int, default=10)
     parser.add_argument('--lr', type=float, default=1e-3)
     parser.add_argument('--device', default='cuda:0')
 
