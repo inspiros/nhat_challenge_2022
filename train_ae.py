@@ -1,14 +1,15 @@
 import argparse
 import os
+import sys
 
 import torch
 from torch.utils.data import DataLoader
 from torchvision import transforms
+from tqdm import tqdm
 
 from datasets.h36m import H36MRestorationDataset
 from models.ae import AutoEncoder
 from models.losses import *
-from utils.trainer import *
 
 
 # noinspection DuplicatedCode
@@ -32,6 +33,59 @@ def parse_args():
     args = parser.parse_args()
     args.device = torch.device(args.device)
     return args
+
+
+def train(train_loader, model, criterion, optimizer, device='cpu'):
+    """train function"""
+    model.train()
+
+    running_loss = 0.0
+    pbar = tqdm(train_loader, desc='[Training]', file=sys.stdout)
+    for batch_id, (X, Y) in enumerate(pbar):
+        X = X.to(device)
+        Y = Y.to(device)
+
+        # centerize around spine
+        Y_c = Y[..., 7:8]
+        X = X - Y_c
+        Y = Y - Y_c
+
+        optimizer.zero_grad()
+        Y_rec = model(X)
+        loss = criterion(Y_rec, Y)
+        loss.backward()
+        optimizer.step()
+
+        running_loss += loss.item() * X.size(0)
+        pbar.set_description(f'[Training iter {batch_id + 1}/{len(train_loader)}]'
+                             f' batch_loss={loss.item():.03f}')
+    return running_loss / len(train_loader.dataset)
+
+
+@torch.no_grad()
+def test(test_loader, model, metric, device='cpu'):
+    """test function"""
+    model.eval()
+
+    running_metric = 0.0
+    pbar = tqdm(test_loader, desc='[Testing]', file=sys.stdout)
+    for batch_id, (X, Y) in enumerate(pbar):
+        X = X.to(device)
+        Y = Y.to(device)
+
+        # centerize around spine
+        Y_c = Y[..., 7:8]
+        X = X - Y_c
+        Y = Y - Y_c
+
+        Y_rec = model(X)
+
+        metric_value = metric(Y_rec, Y)
+
+        running_metric += metric_value.item() * X.size(0)
+        pbar.set_description(f'[Validation iter {batch_id + 1}/{len(test_loader)}]'
+                             f' batch_metric={metric_value.item():.03f}')
+    return running_metric / len(test_loader.dataset)
 
 
 # noinspection DuplicatedCode
