@@ -5,6 +5,9 @@ __all__ = ['VAE']
 
 
 class VAE(nn.Module):
+    """
+    VAE model used in https://www.researchgate.net/publication/330693927_Filling_the_Gaps_Predicting_Missing_Joints_of_Human_Poses_Using_Denoising_Autoencoders.
+    """
 
     def __init__(self, in_channels, out_channels, num_joints, latent_dim=20):
         super(VAE, self).__init__()

@@ -33,7 +33,8 @@ _May 20th 2022 - May 23th 2022_
 
 #### Resources:
 
-- Example training script using simple VAE:
+- Example training script using simple VAE used in the paper _Filling the Gaps Predicting Missing Joints of Human Poses
+  Using Denoising Autoencoders_.
 
 ```terminal
 python train.py
