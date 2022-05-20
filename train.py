@@ -44,6 +44,11 @@ def train(train_loader, model, criterion, optimizer, device='cpu'):
         X = X.to(device)
         Y = Y.to(device)
 
+        # centerize around spine
+        Y_c = Y[..., 7:8]
+        X = X - Y_c
+        Y = Y - Y_c
+
         optimizer.zero_grad()
         # Y_rec, mu, logvar = model(X)
         # loss = criterion(Y_rec, Y) + 0.1 * kld_loss(mu, logvar)
@@ -69,7 +74,13 @@ def test(test_loader, model, metric, device='cpu'):
         X = X.to(device)
         Y = Y.to(device)
 
+        # centerize around spine
+        Y_c = Y[..., 7:8]
+        X = X - Y_c
+        Y = Y - Y_c
+
         Y_rec = model(X)
+
         metric_value = metric(Y_rec, Y)
 
         running_metric += metric_value.item() * X.size(0)
