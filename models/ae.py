@@ -4,20 +4,18 @@ __all__ = ['AutoEncoder']
 
 
 class AutoEncoder(nn.Module):
-    def __init__(self, in_channels, out_channels, num_joints=17):
+    def __init__(self, in_channels, out_channels, num_joints=17, dropout=0.05):
         super(AutoEncoder, self).__init__()
         self.encoder = nn.Sequential(
             nn.Linear(in_channels * num_joints, 64),
             nn.ReLU(inplace=True),
+            nn.Dropout(p=dropout),
             nn.Linear(64, 128),
-            nn.ReLU(inplace=True),
-            nn.Linear(128, 256),
         )
         self.decoder = nn.Sequential(
-            nn.Linear(256, 128),
-            nn.ReLU(inplace=True),
             nn.Linear(128, 64),
             nn.ReLU(inplace=True),
+            nn.Dropout(p=dropout),
             nn.Linear(64, out_channels * num_joints),
         )
 
