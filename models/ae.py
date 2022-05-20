@@ -27,5 +27,5 @@ class AutoEncoder(nn.Module):
         x = self.encoder(x)
         x = self.decoder(x)
 
-        x = x.view(N, C, T, V)
+        x = x.view(N, -1, T, V)
         return x

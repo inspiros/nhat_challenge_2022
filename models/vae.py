@@ -39,30 +39,29 @@ class VAE(nn.Module):
 
     def encode(self, x):
         h = self.encoder(x)
-        mu, logvar = self.fc_mu(h), self.fc_var(h)
-        return mu, logvar
+        mu, log_var = self.fc_mu(h), self.fc_var(h)
+        return mu, log_var
 
     def decode(self, z):
         z = self.decoder(z)
         return z
 
-    def reparameterize(self, mu, logvar):
+    def reparameterize(self, mu, log_var):
         if self.training:
-            std = torch.exp(0.5 * logvar)
+            std = torch.exp(0.5 * log_var)
             eps = torch.randn_like(std)
-            return eps.mul(std).add_(mu)
+            return mu + eps * std
         else:
             return mu
 
     def forward(self, x):
         N, C, T, V = x.size()
         assert T == 1
-
         x = x.view(N, C * V)
 
-        mu, logvar = self.encode(x)
-        z = self.reparameterize(mu, logvar)
+        mu, log_var = self.encode(x)
+        z = self.reparameterize(mu, log_var)
         out = self.decode(z)
 
         out = out.view(N, -1, T, V)
-        return out, mu, logvar
+        return out, mu, log_var
