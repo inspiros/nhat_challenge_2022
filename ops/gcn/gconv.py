@@ -18,6 +18,12 @@ class GConv(nn.Module):
         in_channels (int): Number of channels in the input sequence data
         out_channels (int): Number of channels produced by the convolution
         kernel_size (int): Size of the graph convolving kernel
+        temporal_kernel_size (int): Size of the temporal convolving kernel
+        temporal_stride (int, optional): Stride of the temporal convolution. Default: 1
+        temporal_padding (int, optional): Temporal zero-padding added to both sides of
+            the input. Default: 0
+        temporal_dilation (int, optional): Spacing between temporal kernel elements.
+            Default: 1
         bias (bool, optional): If ``True``, adds a learnable bias to the output.
             Default: ``True``
     Shape:
@@ -36,28 +42,21 @@ class GConv(nn.Module):
                  in_channels,
                  out_channels,
                  kernel_size,
+                 temporal_kernel_size=1,
+                 temporal_stride=1,
+                 temporal_padding=0,
+                 temporal_dilation=1,
                  bias=True):
         super(GConv, self).__init__()
 
-        self.in_channels = in_channels
-        self.out_channels = out_channels
         self.kernel_size = kernel_size
-
-        self.linear_weight = nn.Parameter(
-            torch.randn(in_channels, out_channels * kernel_size), requires_grad=True)
-        if bias:
-            self.linear_bias = nn.Parameter(
-                torch.zeros(out_channels * kernel_size), requires_grad=True)
-        else:
-            self.register_parameter('linear_bias', None)
-
-        self._init_weights()
-
-    def _init_weights(self):
-        nn.init.normal_(self.linear_weight, 0, math.sqrt(
-            0.5 / (self.out_channels * self.kernel_size)))
-        if self.linear_bias is not None:
-            nn.init.zeros_(self.linear_bias)
+        self.conv = nn.Conv2d(in_channels,
+                              out_channels * kernel_size,
+                              kernel_size=(temporal_kernel_size, 1),
+                              padding=(temporal_padding, 0),
+                              stride=(temporal_stride, 1),
+                              dilation=(temporal_dilation, 1),
+                              bias=bias)
 
     def forward(self, x, A):
         """
@@ -77,9 +76,7 @@ class GConv(nn.Module):
         """
         assert A.size(0) == self.kernel_size
 
-        x = torch.einsum('nctw,cd->ndtw', x, self.linear_weight)
-        if self.linear_bias is not None:
-            x = x + self.linear_bias.view(1, -1, 1, 1)
+        x = self.conv(x)
 
         n, kc, t, v = x.size()
         x = x.view(n, self.kernel_size, kc // self.kernel_size, t, v)
@@ -95,6 +92,10 @@ class PartialGConv(nn.Module):
                  in_channels,
                  out_channels,
                  kernel_size,
+                 temporal_kernel_size=1,
+                 temporal_stride=1,
+                 temporal_padding=0,
+                 temporal_dilation=1,
                  bias=True,
                  multi_channel=True,
                  return_mask=True,
@@ -105,21 +106,17 @@ class PartialGConv(nn.Module):
         self.return_mask = return_mask
         self.eps = eps
 
-        self.in_channels = in_channels
-        self.out_channels = out_channels
         self.kernel_size = kernel_size
-
-        self.linear_weight = nn.Parameter(
-            torch.randn(in_channels, out_channels * kernel_size), requires_grad=True)
-        self.register_buffer(
-            'linear_mask_update_weight',
-            torch.ones(in_channels, out_channels * kernel_size)
-        )
-        if bias:
-            self.linear_bias = nn.Parameter(
-                torch.zeros(out_channels * kernel_size), requires_grad=True)
-        else:
-            self.register_parameter('linear_bias', None)
+        self.conv = PartialConv2d(in_channels,
+                                  out_channels * kernel_size,
+                                  kernel_size=(temporal_kernel_size, 1),
+                                  padding=(temporal_padding, 0),
+                                  stride=(temporal_stride, 1),
+                                  dilation=(temporal_dilation, 1),
+                                  bias=bias,
+                                  multi_channel=multi_channel,
+                                  return_mask=True,
+                                  eps=eps)
 
     def forward(self, x, A, mask=None):
         """
@@ -141,18 +138,7 @@ class PartialGConv(nn.Module):
         """
         assert A.size(0) == self.kernel_size
 
-        x = torch.einsum('nctw,cd->ndtw', x, self.linear_weight)
-        with torch.no_grad():
-            mask = torch.einsum('nctw,cd->ndtw', mask, self.linear_mask_update_weight)
-            mask = mask / self.in_channels
-            mask_ratio = 1 / (mask + self.eps)
-            mask = mask.bool().to(x.dtype)
-            mask_ratio = mask_ratio * mask
-        if self.linear_bias is not None:
-            bias_view = self.linear_bias.view(1, -1, 1, 1)
-            x = mask * (x * mask_ratio + bias_view)
-        else:
-            x = x * mask_ratio
+        x, mask = self.conv(x, mask)
 
         n, kc, t, v = x.size()
         x = x.view(n, self.kernel_size, kc // self.kernel_size, t, v)
