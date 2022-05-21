@@ -8,6 +8,7 @@ from torchvision import transforms
 from tqdm import tqdm
 
 from datasets.h36m import H36MRestorationDataset
+from datasets.transforms import *
 from models.losses import *
 from models.vae import VAE
 
@@ -17,6 +18,9 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--data_file', default='data/data_2d_h36m_gt.npz')
     parser.add_argument('--checkpoint_dir', default='checkpoints')
+
+    parser.add_argument('--identity', action='store_true',
+                        help='run identity reconstruction task.')
 
     parser.add_argument('--batch_size', type=int, default=256)
     parser.add_argument('--max_epoch', type=int, default=10)
@@ -41,7 +45,7 @@ def train(train_loader, model, criterion, optimizer, device='cpu'):
 
     running_loss = 0.0
     pbar = tqdm(train_loader, desc='[Training]', file=sys.stdout)
-    for batch_id, (X, Y) in enumerate(pbar):
+    for batch_id, ((X, mask), Y) in enumerate(pbar):
         X = X.to(device)
         Y = Y.to(device)
 
@@ -49,6 +53,9 @@ def train(train_loader, model, criterion, optimizer, device='cpu'):
         Y_c = Y[..., 7:8]
         X = X - Y_c
         Y = Y - Y_c
+
+        # apply mask
+        X[mask == 0] = 0
 
         optimizer.zero_grad()
         Y_rec, mu, log_var = model(X)
@@ -69,7 +76,7 @@ def test(test_loader, model, metric, device='cpu'):
 
     running_metric = 0.0
     pbar = tqdm(test_loader, desc='[Testing]', file=sys.stdout)
-    for batch_id, (X, Y) in enumerate(pbar):
+    for batch_id, ((X, mask), Y) in enumerate(pbar):
         X = X.to(device)
         Y = Y.to(device)
 
@@ -77,6 +84,9 @@ def test(test_loader, model, metric, device='cpu'):
         Y_c = Y[..., 7:8]
         X = X - Y_c
         Y = Y - Y_c
+
+        # apply mask
+        X[mask == 0] = 0
 
         Y_rec, _, _ = model(X)
 
@@ -95,7 +105,15 @@ def main():
     normalize = transforms.Lambda(lambda x: x / 500 - 1)  # [0, w] -> [-1, 1]
     denormalize = transforms.Lambda(lambda x: (x + 1) * 500)  # [-1, 1] -> [0, w]
 
+    corrupt_transform = WithMaskCompose([
+        RandomMaskKeypointBetween(low=0, high=6),
+    ] if not args.identity else [])
     transform = transforms.Compose([
+        normalize,
+        transforms.Lambda(lambda x: x.permute(2, 0, 1)),  # [T, V, C] -> [C, T, V]
+        corrupt_transform,
+    ])
+    target_transform = transforms.Compose([
         normalize,
         transforms.Lambda(lambda x: x.permute(2, 0, 1)),  # [T, V, C] -> [C, T, V]
     ])
@@ -104,13 +122,13 @@ def main():
         source_file_path=args.data_file,
         partition='train',
         transform=transform,
-        target_transform=transform,
+        target_transform=target_transform,
     )
     test_set = H36MRestorationDataset(
         source_file_path=args.data_file,
         partition='test',
         transform=transform,
-        target_transform=transform,
+        target_transform=target_transform,
     )
 
     train_loader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True)
