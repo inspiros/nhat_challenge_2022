@@ -50,9 +50,6 @@ def train(train_loader, model, criterion, optimizer, device='cpu'):
         X = X.to(device)
         Y = Y.to(device)
 
-        # apply mask
-        X[mask == 0] = 0
-
         # centerize around spine
         Y_c = Y[..., 7:8]
         X = X - Y_c
@@ -81,16 +78,12 @@ def test(test_loader, model, metric, device='cpu'):
         X = X.to(device)
         Y = Y.to(device)
 
-        # apply mask
-        X[mask == 0] = 0
-
         # centerize around spine
         Y_c = Y[..., 7:8]
         X = X - Y_c
         Y = Y - Y_c
 
-        # Y_rec = model(X)
-        Y_rec = X
+        Y_rec = model(X)
 
         metric_value = metric(Y_rec, Y)
 
@@ -107,9 +100,12 @@ def main():
     normalize = transforms.Lambda(lambda x: x / 1000)  # [0, w] -> [-1, 1]
     denormalize = transforms.Lambda(lambda x: x * 1000)  # [-1, 1] -> [0, w]
 
-    corrupt_transform = WithMaskCompose([
-        RandomMaskKeypointBetween(low=0, high=6),
-    ] if not args.identity else [])
+    if not args.identity:
+        corrupt_transform = WithMaskCompose([
+            RandomMaskKeypointBetween(low=0, high=6),
+        ], fill_masked=True)
+    else:
+        corrupt_transform = WithMask()
     transform = transforms.Compose([
         normalize,
         transforms.Lambda(lambda x: x.permute(2, 0, 1)),  # [T, V, C] -> [C, T, V]
@@ -163,10 +159,10 @@ def main():
     for epoch in range(start_epoch, args.max_epoch):
         print(f'[Epoch {epoch + 1} / {args.max_epoch}]')
         # train
-        # epoch_loss = train(train_loader, model, criterion, optimizer, args.device)
-        # scheduler.step()
-        # print(f'[Epoch {epoch + 1} / {args.max_epoch}] '
-        #       f'train_loss={epoch_loss:.4f}')
+        epoch_loss = train(train_loader, model, criterion, optimizer, args.device)
+        scheduler.step()
+        print(f'[Epoch {epoch + 1} / {args.max_epoch}] '
+              f'train_loss={epoch_loss:.4f}')
 
         # val
         if (epoch + 1) % args.val_frequency == 0 or epoch == args.max_epoch - 1:

@@ -50,13 +50,13 @@ def train(train_loader, model, criterion, optimizer, device='cpu'):
         X = X.to(device)
         Y = Y.to(device)
 
+        # apply mask
+        X[mask == 0] = 0
+
         # centerize around spine
         Y_c = Y[..., 7:8]
         X = X - Y_c
         Y = Y - Y_c
-
-        # apply mask
-        X[mask == 0] = 0
 
         optimizer.zero_grad()
         Y_rec, mu, log_var = model(X)
@@ -81,13 +81,13 @@ def test(test_loader, model, metric, device='cpu'):
         X = X.to(device)
         Y = Y.to(device)
 
+        # apply mask
+        X[mask == 0] = 0
+
         # centerize around spine
         Y_c = Y[..., 7:8]
         X = X - Y_c
         Y = Y - Y_c
-
-        # apply mask
-        X[mask == 0] = 0
 
         Y_rec, _, _ = model(X)
 
@@ -103,12 +103,15 @@ def test(test_loader, model, metric, device='cpu'):
 def main():
     args = parse_args()
 
-    normalize = transforms.Lambda(lambda x: x / 500 - 1)  # [0, w] -> [-1, 1]
-    denormalize = transforms.Lambda(lambda x: (x + 1) * 500)  # [-1, 1] -> [0, w]
+    normalize = transforms.Lambda(lambda x: x / 1000)  # [0, w] -> [-1, 1]
+    denormalize = transforms.Lambda(lambda x: x * 1000)  # [-1, 1] -> [0, w]
 
-    corrupt_transform = WithMaskCompose([
-        RandomMaskKeypointBetween(low=0, high=6),
-    ] if not args.identity else [])
+    if not args.identity:
+        corrupt_transform = WithMaskCompose([
+            RandomMaskKeypointBetween(low=0, high=6),
+        ], fill_masked=True)
+    else:
+        corrupt_transform = WithMask()
     transform = transforms.Compose([
         normalize,
         transforms.Lambda(lambda x: x.permute(2, 0, 1)),  # [T, V, C] -> [C, T, V]

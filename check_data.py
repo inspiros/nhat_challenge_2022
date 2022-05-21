@@ -17,13 +17,15 @@ def parse_args():
 def main():
     args = parse_args()
 
+    corrupt_transform = WithMaskCompose([
+        # RandomMaskKeypoint(p=0.9, temporal_p=0.5),
+        RandomMaskKeypointBetween(low=0, high=6),
+        RandomMaskFrameBetween(low=0, high=3),
+    ], fill_masked=True)
     transform = transforms.Compose([
         transforms.Lambda(lambda x: x / 1000),  # frame normalize
         transforms.Lambda(lambda x: x.permute(2, 0, 1)),  # [T, V, C] -> [C, T, V]
-        WithMaskCompose([
-            # RandomMaskKeypoint(p=0.9, temporal_p=0.5),
-            RandomMaskKeypointBetween(low=0, high=6),
-        ]),
+        corrupt_transform,
     ])
     target_transform = transforms.Compose([
         transforms.Lambda(lambda x: x / 1000),  # frame normalize
@@ -32,6 +34,8 @@ def main():
 
     test_set = H36MRestorationDataset(
         source_file_path=args.data_file,
+        sample_length=9,
+        sample_step=1,
         partition='test',
         transform=transform,
         target_transform=target_transform,
@@ -41,7 +45,7 @@ def main():
     for batch_id, ((X, mask), Y) in enumerate(test_loader):
         # print(X.shape, Y.shape)
         print(X.shape, mask.shape)
-        print('n_missing:', (1 - mask[:, 0]).sum().item())
+        print(mask[:, 0])
 
 
 if __name__ == '__main__':
