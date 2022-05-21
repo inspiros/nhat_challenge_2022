@@ -54,7 +54,8 @@ def train(train_loader, model, criterion, optimizer, device='cpu'):
         X[mask == 0] = 0
 
         # centerize around spine
-        Y_c = Y[..., 7:8]
+        T_c = Y.size(2) // 2
+        Y_c = Y[..., T_c:T_c + 1, 7:8]
         X = X - Y_c
         Y = Y - Y_c
 
@@ -85,7 +86,8 @@ def test(test_loader, model, metric, device='cpu'):
         X[mask == 0] = 0
 
         # centerize around spine
-        Y_c = Y[..., 7:8]
+        T_c = Y.size(2) // 2
+        Y_c = Y[..., T_c:T_c + 1, 7:8]
         X = X - Y_c
         Y = Y - Y_c
 
