@@ -33,8 +33,9 @@ class PartialDropout(nn.Dropout):
     def forward(self, x, mask):
         if not self.training:
             return x, mask
-        if self.inplace:
+        if not self.inplace:
             x = x.clone()
+            mask = mask.clone()
         drop_mask = torch.rand(x.numel()).lt(self.p).view_as(x)
         x[drop_mask] = 0
         mask[drop_mask] = 0
