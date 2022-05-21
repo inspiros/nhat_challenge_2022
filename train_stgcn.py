@@ -9,7 +9,7 @@ from tqdm import tqdm
 
 from datasets.h36m import H36MRestorationDataset
 from datasets.transforms import *
-from models.simple_gcn import SimpleGCN
+from models.st_gcn import CaiSTGCN
 from models.losses import *
 
 
@@ -17,7 +17,7 @@ from models.losses import *
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--data_file', default='data/data_2d_h36m_gt.npz')
-    parser.add_argument('--checkpoint_dir', default='checkpoints/gcn')
+    parser.add_argument('--checkpoint_dir', default='checkpoints/stgcn')
 
     parser.add_argument('--phase', choices=['train', 'test', 'inference'], default='train')
     parser.add_argument('--identity', action='store_true',
@@ -51,9 +51,9 @@ def train(train_loader, model, criterion, optimizer, device='cpu'):
         Y = Y.to(device)
 
         # centerize around spine
-        Y_c = Y[..., 7:8]
-        X = X - Y_c
-        Y = Y - Y_c
+        # Y_c = Y[..., 7:8]
+        # X = X - Y_c
+        # Y = Y - Y_c
 
         optimizer.zero_grad()
         Y_rec = model(X)
@@ -79,9 +79,9 @@ def test(test_loader, model, metric, device='cpu'):
         Y = Y.to(device)
 
         # centerize around spine
-        Y_c = Y[..., 7:8]
-        X = X - Y_c
-        Y = Y - Y_c
+        # Y_c = Y[..., 7:8]
+        # X = X - Y_c
+        # Y = Y - Y_c
 
         Y_rec = model(X)
 
@@ -132,12 +132,13 @@ def main():
     train_loader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True)
     test_loader = DataLoader(test_set, batch_size=args.batch_size, shuffle=False)
 
-    model = SimpleGCN(in_channels=2,
-                      out_channels=2,
-                      layout='h36m',
-                      strategy='spatial',
-                      dropout=0.05,
-                      )
+    model = CaiSTGCN(in_channels=2,
+                     out_channels=2,
+                     seq_len=1,
+                     layout='h36m',
+                     strategy='spatial',
+                     dropout=0.05,
+                     )
     model.to(args.device)
     criterion = MPJPELoss(dim=1)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
