@@ -29,7 +29,7 @@ class PartialLinear(nn.Linear):
             mask_ratio = mask_ratio * mask
 
         if self.bias is not None:
-            bias_view = self.bias.view(1, -1, 1, 1)
+            bias_view = self.bias.view(1, -1)
             output = mask * (output * mask_ratio + bias_view)
         else:
             output = output * mask_ratio

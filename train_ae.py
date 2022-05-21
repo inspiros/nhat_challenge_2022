@@ -9,7 +9,7 @@ from tqdm import tqdm
 
 from datasets.h36m import H36MRestorationDataset
 from datasets.transforms import *
-from models.ae import AutoEncoder
+from models.ae import *
 from models.losses import *
 
 
@@ -22,6 +22,8 @@ def parse_args():
     parser.add_argument('--phase', choices=['train', 'test', 'inference'], default='train')
     parser.add_argument('--identity', action='store_true',
                         help='run identity reconstruction task.')
+    parser.add_argument('--partial', action='store_true',
+                        help='use partial version of the model.')
 
     parser.add_argument('--batch_size', type=int, default=256)
     parser.add_argument('--max_epoch', type=int, default=10)
@@ -40,7 +42,7 @@ def parse_args():
     return args
 
 
-def train(train_loader, model, criterion, optimizer, device='cpu'):
+def train(train_loader, model, criterion, optimizer, device='cpu', use_mask=False):
     """train function"""
     model.train()
 
@@ -57,7 +59,11 @@ def train(train_loader, model, criterion, optimizer, device='cpu'):
         Y = Y - Y_c
 
         optimizer.zero_grad()
-        Y_rec = model(X)
+        if not use_mask:
+            Y_rec = model(X)
+        else:
+            mask = mask.to(device)
+            Y_rec = model(X, mask)
         loss = criterion(Y_rec, Y)
         loss.backward()
         optimizer.step()
@@ -69,7 +75,7 @@ def train(train_loader, model, criterion, optimizer, device='cpu'):
 
 
 @torch.no_grad()
-def test(test_loader, model, metric, device='cpu'):
+def test(test_loader, model, metric, device='cpu', use_mask=False):
     """test function"""
     model.eval()
 
@@ -85,7 +91,11 @@ def test(test_loader, model, metric, device='cpu'):
         X = X - Y_c
         Y = Y - Y_c
 
-        Y_rec = model(X)
+        if not use_mask:
+            Y_rec = model(X)
+        else:
+            mask = mask.to(device)
+            Y_rec = model(X, mask)
 
         metric_value = metric(Y_rec, Y)
 
@@ -134,11 +144,12 @@ def main():
     train_loader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True)
     test_loader = DataLoader(test_set, batch_size=args.batch_size, shuffle=False)
 
-    model = AutoEncoder(in_channels=2,
-                        out_channels=2,
-                        num_joints=17,
-                        dropout=0.05,
-                        )
+    model_type = AutoEncoder if not args.partial else PartialAutoEncoder
+    model = model_type(in_channels=2,
+                       out_channels=2,
+                       num_joints=17,
+                       dropout=0.05,
+                       )
     model.to(args.device)
     criterion = MPJPELoss(dim=1)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
@@ -161,14 +172,14 @@ def main():
     for epoch in range(start_epoch, args.max_epoch):
         print(f'[Epoch {epoch + 1} / {args.max_epoch}]')
         # train
-        epoch_loss = train(train_loader, model, criterion, optimizer, args.device)
+        epoch_loss = train(train_loader, model, criterion, optimizer, args.device, use_mask=args.partial)
         scheduler.step()
         print(f'[Epoch {epoch + 1} / {args.max_epoch}] '
               f'train_loss={epoch_loss:.4f}')
 
         # val
         if (epoch + 1) % args.val_frequency == 0 or epoch == args.max_epoch - 1:
-            epoch_mpjpe = test(test_loader, model, metric, args.device)
+            epoch_mpjpe = test(test_loader, model, metric, args.device, use_mask=args.partial)
             print(f'[Epoch {epoch + 1} / {args.max_epoch}] '
                   f'val_mpjpe={epoch_mpjpe:.4f}')
 
