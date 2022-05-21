@@ -19,6 +19,7 @@ def parse_args():
     parser.add_argument('--data_file', default='data/data_2d_h36m_gt.npz')
     parser.add_argument('--checkpoint_dir', default='checkpoints')
 
+    parser.add_argument('--phase', choices=['train', 'test', 'inference'], default='train')
     parser.add_argument('--identity', action='store_true',
                         help='run identity reconstruction task.')
 

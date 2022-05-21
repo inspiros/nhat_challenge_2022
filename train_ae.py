@@ -19,6 +19,7 @@ def parse_args():
     parser.add_argument('--data_file', default='data/data_2d_h36m_gt.npz')
     parser.add_argument('--checkpoint_dir', default='checkpoints')
 
+    parser.add_argument('--phase', choices=['train', 'test', 'inference'], default='train')
     parser.add_argument('--identity', action='store_true',
                         help='run identity reconstruction task.')
 
@@ -88,7 +89,8 @@ def test(test_loader, model, metric, device='cpu'):
         X = X - Y_c
         Y = Y - Y_c
 
-        Y_rec = model(X)
+        # Y_rec = model(X)
+        Y_rec = X
 
         metric_value = metric(Y_rec, Y)
 
@@ -161,10 +163,10 @@ def main():
     for epoch in range(start_epoch, args.max_epoch):
         print(f'[Epoch {epoch + 1} / {args.max_epoch}]')
         # train
-        epoch_loss = train(train_loader, model, criterion, optimizer, args.device)
-        scheduler.step()
-        print(f'[Epoch {epoch + 1} / {args.max_epoch}] '
-              f'train_loss={epoch_loss:.4f}')
+        # epoch_loss = train(train_loader, model, criterion, optimizer, args.device)
+        # scheduler.step()
+        # print(f'[Epoch {epoch + 1} / {args.max_epoch}] '
+        #       f'train_loss={epoch_loss:.4f}')
 
         # val
         if (epoch + 1) % args.val_frequency == 0 or epoch == args.max_epoch - 1:
