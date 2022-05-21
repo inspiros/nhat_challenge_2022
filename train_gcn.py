@@ -9,15 +9,15 @@ from tqdm import tqdm
 
 from datasets.h36m import H36MRestorationDataset
 from datasets.transforms import *
+from models.gcn import SimpleGCN
 from models.losses import *
-from models.vae import VAE
 
 
 # noinspection DuplicatedCode
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--data_file', default='data/data_2d_h36m_gt.npz')
-    parser.add_argument('--checkpoint_dir', default='checkpoints/vae')
+    parser.add_argument('--checkpoint_dir', default='checkpoints/gcn')
 
     parser.add_argument('--phase', choices=['train', 'test', 'inference'], default='train')
     parser.add_argument('--identity', action='store_true',
@@ -50,17 +50,14 @@ def train(train_loader, model, criterion, optimizer, device='cpu'):
         X = X.to(device)
         Y = Y.to(device)
 
-        # apply mask
-        X[mask == 0] = 0
-
         # centerize around spine
         Y_c = Y[..., 7:8]
         X = X - Y_c
         Y = Y - Y_c
 
         optimizer.zero_grad()
-        Y_rec, mu, log_var = model(X)
-        loss = criterion(Y_rec, Y) + kld_loss(mu, log_var)
+        Y_rec = model(X)
+        loss = criterion(Y_rec, Y)
         loss.backward()
         optimizer.step()
 
@@ -81,15 +78,12 @@ def test(test_loader, model, metric, device='cpu'):
         X = X.to(device)
         Y = Y.to(device)
 
-        # apply mask
-        X[mask == 0] = 0
-
         # centerize around spine
         Y_c = Y[..., 7:8]
         X = X - Y_c
         Y = Y - Y_c
 
-        Y_rec, _, _ = model(X)
+        Y_rec = model(X)
 
         metric_value = metric(Y_rec, Y)
 
@@ -138,11 +132,12 @@ def main():
     train_loader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True)
     test_loader = DataLoader(test_set, batch_size=args.batch_size, shuffle=False)
 
-    model = VAE(in_channels=2,
-                out_channels=2,
-                num_joints=17,
-                latent_dim=20,
-                )
+    model = SimpleGCN(in_channels=2,
+                      out_channels=2,
+                      layout='h36m',
+                      strategy='spatial',
+                      dropout=0.05,
+                      )
     model.to(args.device)
     criterion = MPJPELoss(dim=1)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)

@@ -18,10 +18,10 @@ save it to folder `data`.
 
 ##### Objective:
 
-- Train a model that:
-    - Inputs a 2D human pose of shape `[N, C, T, V]=[N, 2, 1, 17]` and outputs the same 2D
+- Train a model for two tasks:
+    - **Identity reconstruction**: Inputs a 2D human pose of shape `[N, C, T, V]=[N, 2, 1, 17]` and outputs the same 2D
       human pose.
-    - Inputs a corrupted 2D human pose (with some keypoints randomly set to 0) and reconstructs the groundtruth 2D human
+    - **Missing keypoints prediction**: Inputs a corrupted 2D human pose (with some keypoints randomly set to 0) and reconstructs the groundtruth 2D human
       pose.
 - Free to use any normalization/augmentation technique.
 - Evaluation metric:
@@ -33,12 +33,8 @@ _May 20th 2022 - May 23th 2022_
 
 #### Resources:
 
-- Example training script using simple VAE used in the paper _Filling the Gaps Predicting Missing Joints of Human Poses
+- Example training scripts using simple overcomplete AE/VAE used in the paper _Filling the Gaps Predicting Missing Joints of Human Poses
   Using Denoising Autoencoders_.
-
-```terminal
-python train.py
-```
 
 - Visualize dataset:
 
