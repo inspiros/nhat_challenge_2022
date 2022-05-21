@@ -46,4 +46,7 @@ python train.py
 python check_data.py
 ```
 
+- Refs:
+  - https://stats.stackexchange.com/questions/424558/why-is-it-hard-for-a-neural-network-to-learn-the-identity-function
+
 _All hope is lost, all light is dimmed!_
