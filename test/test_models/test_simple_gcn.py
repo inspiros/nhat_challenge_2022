@@ -1,5 +1,5 @@
 import torch
-from models.gcn import SimpleGCN
+from models.simple_gcn import SimpleGCN
 
 
 def main():

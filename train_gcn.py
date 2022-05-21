@@ -9,7 +9,8 @@ from tqdm import tqdm
 
 from datasets.h36m import H36MRestorationDataset
 from datasets.transforms import *
-from models.gcn import SimpleGCN
+# from models.simple_gcn import SimpleGCN
+from models.st_gcn import CaiSTGCN
 from models.losses import *
 
 
@@ -132,12 +133,19 @@ def main():
     train_loader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True)
     test_loader = DataLoader(test_set, batch_size=args.batch_size, shuffle=False)
 
-    model = SimpleGCN(in_channels=2,
-                      out_channels=2,
-                      layout='h36m',
-                      strategy='spatial',
-                      dropout=0.05,
-                      )
+    # model = SimpleGCN(in_channels=2,
+    #                   out_channels=2,
+    #                   layout='h36m',
+    #                   strategy='spatial',
+    #                   dropout=0.05,
+    #                   )
+    model = CaiSTGCN(in_channels=2,
+                     out_channels=2,
+                     seq_len=1,
+                     layout='h36m',
+                     strategy='spatial',
+                     dropout=0.05,
+                     )
     model.to(args.device)
     criterion = MPJPELoss(dim=1)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
