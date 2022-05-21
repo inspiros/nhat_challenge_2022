@@ -22,22 +22,26 @@ def main():
         transforms.Lambda(lambda x: x.permute(2, 0, 1)),  # [T, V, C] -> [C, T, V]
         WithMaskCompose([
             # RandomMaskKeypoint(p=0.9, temporal_p=0.5),
-            RandomMaskKeypointBetween(low=0, high=3),
+            RandomMaskKeypointBetween(low=0, high=6),
         ]),
+    ])
+    target_transform = transforms.Compose([
+        transforms.Lambda(lambda x: x / 1000),  # frame normalize
+        transforms.Lambda(lambda x: x.permute(2, 0, 1)),  # [T, V, C] -> [C, T, V]
     ])
 
     test_set = H36MRestorationDataset(
         source_file_path=args.data_file,
         partition='test',
         transform=transform,
-        target_transform=transform,
+        target_transform=target_transform,
     )
     test_loader = DataLoader(test_set, batch_size=1, shuffle=False)
 
     for batch_id, ((X, mask), Y) in enumerate(test_loader):
         # print(X.shape, Y.shape)
         print(X.shape, mask.shape)
-        print(mask)
+        print('n_missing:', (1 - mask[:, 0]).sum().item())
 
 
 if __name__ == '__main__':

@@ -108,22 +108,25 @@ def main():
         normalize,
         transforms.Lambda(lambda x: x.permute(2, 0, 1)),  # [T, V, C] -> [C, T, V]
         WithMaskCompose([
-            # RandomMaskKeypoint(p=0.9, temporal_p=0.5),
             RandomMaskKeypointBetween(low=0, high=6),
         ]),
+    ])
+    target_transform = transforms.Compose([
+        normalize,
+        transforms.Lambda(lambda x: x.permute(2, 0, 1)),  # [T, V, C] -> [C, T, V]
     ])
 
     train_set = H36MRestorationDataset(
         source_file_path=args.data_file,
         partition='train',
         transform=transform,
-        target_transform=transform,
+        target_transform=target_transform,
     )
     test_set = H36MRestorationDataset(
         source_file_path=args.data_file,
         partition='test',
         transform=transform,
-        target_transform=transform,
+        target_transform=target_transform,
     )
 
     train_loader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True)
