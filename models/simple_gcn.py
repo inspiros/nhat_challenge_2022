@@ -94,7 +94,7 @@ class SimpleGCN(nn.Module):
         self.data_bn = nn.BatchNorm1d(self.in_channels * self.graph.num_node_each, 0.1)
 
         self.gcn0 = GCNBlock(self.in_channels, 32, kernel_size, dropout=dropout)
-        self.gcn1 = GCNBlock(64, 64, kernel_size, dropout=dropout)
+        self.gcn1 = GCNBlock(32, 64, kernel_size, dropout=dropout)
         self.pool1 = GraphMaxPool(self.graph)
 
         self.gcn2 = GCNBlock(64, 128, kernel_size_pool, dropout=dropout)
@@ -125,17 +125,19 @@ class SimpleGCN(nn.Module):
 
         x, _ = self.gcn0(x, self.A)
         x, _ = self.gcn1(x, self.A)
+        x_skip1 = x
         x = self.pool1(x)
 
         x, _ = self.gcn2(x, self.A_pool)
+        x_skip2 = x
         x = self.pool2(x)
 
         x = self.conv(x)
 
-        x = self.upsample1(x)
+        x = self.upsample1(x) + x_skip2
         x, _ = self.gcn3(x, self.A_pool)
 
-        x = self.upsample2(x)
+        x = self.upsample2(x) + x_skip1
         x, _ = self.gcn4(x, self.A)
         x = self.fcn(x)
 
