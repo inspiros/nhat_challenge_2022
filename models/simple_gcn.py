@@ -14,11 +14,18 @@ class GCNBlock(nn.Module):
                  dropout=0.05):
         super(GCNBlock, self).__init__()
         self.gcn = GConv(in_channels, out_channels, kernel_size)
+        self.bn = nn.BatchNorm2d(out_channels)
+        self.tcn = nn.Sequential(
+            nn.Conv2d(out_channels, out_channels, kernel_size=(1, 1)),
+            nn.BatchNorm2d(out_channels),
+        )
         self.relu = nn.ReLU(inplace=True)
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x, A):
         x, A = self.gcn(x, A)
+        x = self.relu(self.bn(x))
+        x = self.tcn(x)
         x = self.relu(x)
         x = self.dropout(x)
         return x, A
