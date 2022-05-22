@@ -102,7 +102,7 @@ class SimpleGCN(nn.Module):
 
         self.conv = nn.Sequential(
             nn.Conv2d(128, 128, kernel_size=(1, 1), padding=(0, 0)),
-            # nn.BatchNorm2d(128, momentum=0.1),
+            nn.BatchNorm2d(128, momentum=0.1),
             nn.ReLU(inplace=True),
             nn.Dropout(dropout),
         )

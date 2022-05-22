@@ -23,6 +23,8 @@ def parse_args():
     parser.add_argument('--identity', action='store_true',
                         help='run identity reconstruction task.')
 
+    parser.add_argument('--seq_len', type=int, default=1)
+
     parser.add_argument('--batch_size', type=int, default=256)
     parser.add_argument('--max_epoch', type=int, default=10)
     parser.add_argument('--lr', type=float, default=1e-3)
@@ -120,12 +122,14 @@ def main():
 
     train_set = H36MRestorationDataset(
         source_file_path=args.data_file,
+        sample_length=args.seq_len,
         partition='train',
         transform=transform,
         target_transform=target_transform,
     )
     test_set = H36MRestorationDataset(
         source_file_path=args.data_file,
+        sample_length=args.seq_len,
         partition='test',
         transform=transform,
         target_transform=target_transform,
@@ -136,7 +140,7 @@ def main():
 
     model = CaiSTGCN(in_channels=2,
                      out_channels=2,
-                     seq_len=1,
+                     seq_len=args.seq_len,
                      layout='h36m',
                      strategy='spatial',
                      dropout=0.05,

@@ -253,18 +253,15 @@ class CaiSTGCN(nn.Module):
             STGCNBlock(self.inter_channels[0], self.inter_channels[1], kernel_size),
             STGCNBlock(self.inter_channels[1], self.inter_channels[2], kernel_size),
         ))
+        self.pool1 = GraphMaxPool(self.graph)
 
         self.st_gcn_pool = nn.ModuleList((
             STGCNBlock(self.inter_channels[-1], self.fc_unit, kernel_size_pool),
             STGCNBlock(self.fc_unit, self.fc_unit, kernel_size_pool),
         ))
-
-        self.pool1 = GraphMaxPool(self.graph)
         self.pool2 = GraphMaxPool(self.graph_pool)
-        self.upsample1 = GraphUpsample(self.graph_pool)
-        self.upsample2 = GraphUpsample(self.graph)
 
-        self.conv4 = nn.Sequential(
+        self.conv1 = nn.Sequential(
             nn.Conv2d(self.fc_unit, self.fc_unit,
                       kernel_size=(3, 1) if self.seq_len > 1 else (1, 1),
                       padding=(1, 0) if self.seq_len > 1 else (0, 0)),
@@ -273,20 +270,28 @@ class CaiSTGCN(nn.Module):
             nn.Dropout(dropout),
         )
 
+        self.upsample1 = GraphUpsample(self.graph_pool)
         self.conv2 = nn.Sequential(
-            nn.Conv2d(self.fc_unit * 2, self.fc_out, kernel_size=(1, 1), padding=(0, 0)),
+            nn.Conv2d(self.fc_unit * 2 if self.cat else self.fc_unit,
+                      self.fc_out,
+                      kernel_size=(1, 1),
+                      padding=(0, 0)),
             nn.BatchNorm2d(self.fc_out, momentum=0.1),
             nn.ReLU(inplace=True),
             nn.Dropout(dropout),
         )
 
-        self.non_local = NonLocal2d(in_channels=self.fc_out * 2, sub_sample=False)
+        self.upsample2 = GraphUpsample(self.graph)
+        self.non_local = NonLocal2d(in_channels=self.fc_out * 2 if self.cat else self.fc_out,
+                                    sub_sample=False)
 
         # fcn for final layer prediction
         fc_in = self.inter_channels[-1] + self.fc_out if self.cat else self.inter_channels[-1]
         self.fcn = nn.Sequential(
             nn.Dropout(dropout, inplace=True),
-            nn.Conv2d(fc_in, self.out_channels, kernel_size=1),
+            nn.Conv2d(fc_in,
+                      self.out_channels,
+                      kernel_size=(1, 1)),
         )
 
     def forward(self, x):
@@ -303,25 +308,34 @@ class CaiSTGCN(nn.Module):
             x, _ = gcn(x, self.A)  # (N * M), C, 1, (T*V)
         x = x.view(N, -1, T, V)  # N, C, T ,V
 
-        # Pooling
-        x_sub1 = self.pool1(x)  # N, C, T, 5
+        # Pooling 1
+        x_res1 = x
+        x = self.pool1(x)  # N, C, T, 5
 
-        x_sub1 = x_sub1.view(N, -1, 1, T * len(self.graph.part))  # N, 512, 1, (T*5)
-        x_sub1, _ = self.st_gcn_pool[0](x_sub1, self.A_pool)  # N, 512, 1, (T*5)
-        x_sub1, _ = self.st_gcn_pool[1](x_sub1, self.A_pool)  # N, 512, 1, (T*5)
-        x_sub1 = x_sub1.view(N, -1, T, len(self.graph.part))  # N, C, T, 5
+        x = x.view(N, -1, 1, T * len(self.graph.part))  # N, 512, 1, (T*5)
+        x, _ = self.st_gcn_pool[0](x, self.A_pool)  # N, 512, 1, (T*5)
+        x, _ = self.st_gcn_pool[1](x, self.A_pool)  # N, 512, 1, (T*5)
+        x = x.view(N, -1, T, len(self.graph.part))  # N, C, T, 5
 
-        x_pool_1 = self.pool2(x_sub1)  # N, 512, T, 1
-        x_pool_1 = self.conv4(x_pool_1)  # N, C, T, 1
+        # Pooling 2
+        x_res2 = x
+        x = self.pool2(x)  # N, 512, T, 1
+        x = self.conv1(x)  # N, C, T, 1
 
-        x_up_sub = torch.cat((self.upsample1(x_pool_1), x_sub1), 1)  # N, 1024, T, 5
-        x_up_sub = self.conv2(x_up_sub)  # N, C, T, 5
+        # Upsample 1
+        x = self.upsample1(x)
+        if self.cat:
+            x = torch.cat((x_res2, x), dim=1)  # N, 1024, T, 5
+        else:
+            x = x_res2 + x
+        x = self.conv2(x)  # N, C, T, 5
 
-        # upsample
-        x_up = self.upsample2(x_up_sub)
-
-        # for non-local and fcn
-        x = torch.cat((x, x_up), dim=1)
+        # Upsample 2
+        x = self.upsample2(x)
+        if self.cat:
+            x = torch.cat((x_res1, x), dim=1)
+        else:
+            x = x_res1 + x
         x = self.non_local(x)  # N, 2C, T, V
         x = self.fcn(x)  # N, 3, T, V
 
