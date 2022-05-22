@@ -11,24 +11,55 @@ class GCNBlock(nn.Module):
                  in_channels,
                  out_channels,
                  kernel_size,
-                 dropout=0.05):
+                 temporal_kernel_size=1,
+                 temporal_stride=1,
+                 temporal_dilation=1,
+                 dropout=0.05,
+                 residual=True,
+                 return_mask=False):
         super(GCNBlock, self).__init__()
+        if temporal_kernel_size % 2 != 1:
+            raise ValueError('temporal_kernel_size must be odd.')
+
+        self.return_mask = return_mask
+
         self.gcn = GConv(in_channels, out_channels, kernel_size)
-        self.bn = nn.BatchNorm2d(out_channels)
+
         self.tcn = nn.Sequential(
-            nn.Conv2d(out_channels, out_channels, kernel_size=(1, 1)),
             nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(out_channels,
+                      out_channels,
+                      kernel_size=(temporal_kernel_size, 1),
+                      stride=(temporal_stride, 1),
+                      dilation=(temporal_dilation, 1),
+                      padding=((temporal_kernel_size - 1) // 2, 0)),
+            nn.BatchNorm2d(out_channels),
+            nn.Dropout(dropout, inplace=True),
         )
+
+        if not residual:
+            self.residual = Zero()
+        elif in_channels == out_channels and temporal_stride == 1:
+            self.residual = nn.Identity()
+        else:
+            self.residual = nn.Sequential(
+                nn.Conv2d(in_channels,
+                          out_channels,
+                          kernel_size=(1, 1),
+                          stride=(temporal_stride, 1),
+                          dilation=(temporal_dilation, 1)),
+                nn.BatchNorm2d(out_channels),
+            )
+
         self.relu = nn.ReLU(inplace=True)
-        self.dropout = nn.Dropout(dropout)
 
     def forward(self, x, A):
+        res = self.residual(x)
         x, A = self.gcn(x, A)
-        x = self.relu(self.bn(x))
-        x = self.tcn(x)
-        x = self.relu(x)
-        x = self.dropout(x)
-        return x, A
+        x = self.tcn(x) + res
+
+        return self.relu(x), A
 
 
 class SimpleGCN(nn.Module):

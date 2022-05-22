@@ -5,7 +5,7 @@ from ops.gcn import Graph, SubGraph, GConv, GraphMaxPool, GraphUpsample
 from ops.non_local import NonLocal2d
 
 __all__ = [
-    'STGCN',
+    'WangSTGCN',
     'CaiSTGCN'
 ]
 
@@ -93,7 +93,7 @@ class STGCNBlock(nn.Module):
 
 
 # noinspection PyPep8Naming
-class STGCN(nn.Module):
+class WangSTGCN(nn.Module):
     r"""Spatial temporal graph convolutional networks.
     Args:
         in_channels (int): Number of channels in the input data
@@ -116,7 +116,7 @@ class STGCN(nn.Module):
                  edge_importance_weighting=False,
                  data_bn=True,
                  **kwargs):
-        super(STGCN, self).__init__()
+        super(WangSTGCN, self).__init__()
 
         # load graph
         self.graph = Graph(**graph_cfg)
@@ -322,7 +322,7 @@ class CaiSTGCN(nn.Module):
 
         # for non-local and fcn
         x = torch.cat((x, x_up), dim=1)
-        # x = self.non_local(x)  # N, 2C, T, V
+        x = self.non_local(x)  # N, 2C, T, V
         x = self.fcn(x)  # N, 3, T, V
 
         # output
