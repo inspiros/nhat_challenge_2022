@@ -47,10 +47,16 @@ class SimpleGCN(nn.Module):
             'A_pool', torch.tensor(self.graph_pool.A, dtype=torch.float32)
         )
 
-        self.gcn1 = GCNBlock(in_channels, 64, self.A.size(0), dropout=dropout)
+        # build networks
+        kernel_size = self.A.size(0)
+        kernel_size_pool = self.A_pool.size(0)
+
+        self.data_bn = nn.BatchNorm1d(self.in_channels * self.graph.num_node_each, 0.1)
+
+        self.gcn1 = GCNBlock(in_channels, 64, kernel_size, dropout=dropout)
         self.pool1 = GraphMaxPool(self.graph)
 
-        self.gcn2 = GCNBlock(64, 128, self.A_pool.size(0), dropout=dropout)
+        self.gcn2 = GCNBlock(64, 128, kernel_size_pool, dropout=dropout)
         self.pool2 = GraphMaxPool(self.graph_pool)
 
         self.conv = nn.Sequential(
@@ -61,13 +67,18 @@ class SimpleGCN(nn.Module):
         )
 
         self.upsample1 = GraphUpsample(self.graph_pool)
-        self.gcn3 = GCNBlock(128, 64, self.A_pool.size(0), dropout=dropout)
+        self.gcn3 = GCNBlock(128, 64, kernel_size_pool, dropout=dropout)
 
         self.upsample2 = GraphUpsample(self.graph)
-        self.gcn4 = GCNBlock(64, out_channels, self.A.size(0), dropout=dropout)
+        self.gcn4 = GCNBlock(64, out_channels, kernel_size, dropout=dropout)
 
     def forward(self, x):
         N, C, T, V = x.size()
+
+        # data normalization
+        x = x.permute(0, 3, 1, 2).contiguous().view(N, V * C, T)
+        x = self.data_bn(x)
+        x = x.view(N, V, C, T).permute(0, 2, 3, 1).contiguous().view(N, C, T, V)
 
         x, _ = self.gcn1(x, self.A)
         x = self.pool1(x)

@@ -322,7 +322,7 @@ class CaiSTGCN(nn.Module):
 
         # for non-local and fcn
         x = torch.cat((x, x_up), dim=1)
-        x = self.non_local(x)  # N, 2C, T, V
+        # x = self.non_local(x)  # N, 2C, T, V
         x = self.fcn(x)  # N, 3, T, V
 
         # output
