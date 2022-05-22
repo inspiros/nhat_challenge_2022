@@ -11,7 +11,7 @@ class GCNBlock(nn.Module):
                  in_channels,
                  out_channels,
                  kernel_size,
-                 dropout=0.0):
+                 dropout=0.05):
         super(GCNBlock, self).__init__()
         self.gcn = GConv(in_channels, out_channels, kernel_size)
         self.relu = nn.ReLU(inplace=True)
@@ -32,6 +32,8 @@ class SimpleGCN(nn.Module):
                  strategy='spatial',
                  dropout=0.05):
         super(SimpleGCN, self).__init__()
+        self.in_channels = in_channels
+        self.out_channels = out_channels
         self.layout = layout
         self.strategy = strategy
 
@@ -53,7 +55,7 @@ class SimpleGCN(nn.Module):
 
         self.data_bn = nn.BatchNorm1d(self.in_channels * self.graph.num_node_each, 0.1)
 
-        self.gcn1 = GCNBlock(in_channels, 64, kernel_size, dropout=dropout)
+        self.gcn1 = GCNBlock(self.in_channels, 64, kernel_size, dropout=dropout)
         self.pool1 = GraphMaxPool(self.graph)
 
         self.gcn2 = GCNBlock(64, 128, kernel_size_pool, dropout=dropout)
@@ -70,7 +72,7 @@ class SimpleGCN(nn.Module):
         self.gcn3 = GCNBlock(128, 64, kernel_size_pool, dropout=dropout)
 
         self.upsample2 = GraphUpsample(self.graph)
-        self.gcn4 = GCNBlock(64, out_channels, kernel_size, dropout=dropout)
+        self.gcn4 = GCNBlock(64, self.out_channels, kernel_size, dropout=dropout)
 
     def forward(self, x):
         N, C, T, V = x.size()
