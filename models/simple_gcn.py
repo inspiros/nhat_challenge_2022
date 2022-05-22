@@ -39,7 +39,7 @@ class GCNBlock(nn.Module):
         )
 
         if not residual:
-            self.residual = Zero()
+            self.residual = lambda x: 0
         elif in_channels == out_channels and temporal_stride == 1:
             self.residual = nn.Identity()
         else:
@@ -91,9 +91,9 @@ class SimpleGCN(nn.Module):
         kernel_size = self.A.size(0)
         kernel_size_pool = self.A_pool.size(0)
 
-        self.data_bn = nn.BatchNorm1d(self.in_channels * self.graph.num_node_each, 0.1)
+        # self.data_bn = nn.BatchNorm1d(self.in_channels * self.graph.num_node_each, 0.1)
 
-        self.gcn0 = GCNBlock(self.in_channels, 32, kernel_size, dropout=dropout)
+        self.gcn0 = GCNBlock(self.in_channels, 32, kernel_size, dropout=dropout, residual=False)
         self.gcn1 = GCNBlock(32, 64, kernel_size, dropout=dropout)
         self.pool1 = GraphMaxPool(self.graph)
 
@@ -116,13 +116,6 @@ class SimpleGCN(nn.Module):
         self.fcn = nn.Conv2d(32, self.out_channels, kernel_size=(1, 1))
 
     def forward(self, x):
-        N, C, T, V = x.size()
-
-        # data normalization
-        x = x.permute(0, 3, 1, 2).contiguous().view(N, V * C, T)
-        x = self.data_bn(x)
-        x = x.view(N, V, C, T).permute(0, 2, 3, 1).contiguous().view(N, C, T, V)
-
         x, _ = self.gcn0(x, self.A)
         x, _ = self.gcn1(x, self.A)
         x_skip1 = x
