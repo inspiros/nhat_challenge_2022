@@ -9,8 +9,8 @@ class BiLSTM(nn.Module):
                  in_channels,
                  out_channels,
                  num_keypoints=17,
-                 hidden_size=256,
-                 num_layers=3,
+                 hidden_size=128,
+                 num_layers=2,
                  dropout=0.05,
                  bidrectional=True):
         super(BiLSTM, self).__init__()

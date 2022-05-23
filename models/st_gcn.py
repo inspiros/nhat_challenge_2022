@@ -15,6 +15,16 @@ class Zero(nn.Module):
         return 0
 
 
+class DataBatchNorm(nn.BatchNorm1d):
+    def forward(self, x):
+        N, C, T, V = x.size()
+        # data normalization
+        x = x.permute(0, 3, 1, 2).contiguous().view(N, V * C, T)
+        x = super(DataBatchNorm, self).forward(x)
+        x = x.view(N, V, C, T).permute(0, 2, 3, 1).contiguous()
+        return x
+
+
 class STGCNBlock(nn.Module):
     r"""Applies a spatial temporal graph convolution over an input graph sequence.
     Args:
@@ -205,7 +215,7 @@ class CaiSTGCN(nn.Module):
     """
     http://openaccess.thecvf.com/content_ICCV_2019/papers/Cai_Exploiting_Spatial-Temporal_Relationships_for_3D_Pose_Estimation_via_Graph_Convolutional_ICCV_2019_paper.pdf
     """
-    inter_channels = [128, 128, 256]
+    inter_channels = [64, 128, 256]
 
     fc_out = inter_channels[-1]
     fc_unit = 512
@@ -214,9 +224,11 @@ class CaiSTGCN(nn.Module):
                  in_channels,
                  out_channels,
                  seq_len=1,
+                 data_bn=False,
                  cat=True,
                  layout='h36m',
                  strategy='spatial',
+                 temporal_connection=True,
                  dropout=0.1):
         super(CaiSTGCN, self).__init__()
         if seq_len % 2 != 1:
@@ -228,16 +240,19 @@ class CaiSTGCN(nn.Module):
         self.layout = layout
         self.strategy = strategy
         self.seq_len = seq_len
+        self.temporal_connection = temporal_connection
         self.cat = cat
 
         # original graph
-        self.graph = Graph(self.layout, self.strategy, seq_len=self.seq_len)
+        self.graph = Graph(self.layout, self.strategy,
+                           seq_len=self.seq_len if self.temporal_connection else 1)
         self.register_buffer(
             'A', torch.tensor(self.graph.A, dtype=torch.float32)
         )  # K, T*V, T*V
 
         # pooled graph
-        self.graph_pool = SubGraph(self.layout, self.strategy, seq_len=self.seq_len)
+        self.graph_pool = SubGraph(self.layout, self.strategy,
+                                   seq_len=self.seq_len if self.temporal_connection else 1)
         self.register_buffer(
             'A_pool', torch.tensor(self.graph_pool.A, dtype=torch.float32)
         )
@@ -246,7 +261,10 @@ class CaiSTGCN(nn.Module):
         kernel_size = self.A.size(0)
         kernel_size_pool = self.A_pool.size(0)
 
-        self.data_bn = nn.BatchNorm1d(self.in_channels * self.graph.num_node_each, 0.1)
+        if data_bn:
+            self.data_bn = DataBatchNorm(self.in_channels * self.graph.num_node_each, 0.1)
+        else:
+            self.data_bn = nn.Identity()
 
         self.st_gcn_networks = nn.ModuleList((
             STGCNBlock(self.in_channels, self.inter_channels[0], kernel_size, residual=False),
@@ -267,7 +285,7 @@ class CaiSTGCN(nn.Module):
                       padding=(1, 0) if self.seq_len > 1 else (0, 0)),
             nn.BatchNorm2d(self.fc_unit, momentum=0.1),
             nn.ReLU(inplace=True),
-            nn.Dropout(dropout),
+            nn.Dropout(p=dropout),
         )
 
         self.upsample1 = GraphUpsample(self.graph_pool)
@@ -278,7 +296,7 @@ class CaiSTGCN(nn.Module):
                       padding=(0, 0)),
             nn.BatchNorm2d(self.fc_out, momentum=0.1),
             nn.ReLU(inplace=True),
-            nn.Dropout(dropout),
+            nn.Dropout(p=dropout),
         )
 
         self.upsample2 = GraphUpsample(self.graph)
@@ -288,7 +306,7 @@ class CaiSTGCN(nn.Module):
         # fcn for final layer prediction
         fc_in = self.inter_channels[-1] + self.fc_out if self.cat else self.inter_channels[-1]
         self.fcn = nn.Sequential(
-            nn.Dropout(dropout, inplace=True),
+            nn.Dropout(p=dropout, inplace=True),
             nn.Conv2d(fc_in,
                       self.out_channels,
                       kernel_size=(1, 1)),
@@ -298,21 +316,21 @@ class CaiSTGCN(nn.Module):
         N, C, T, V = x.size()
 
         # data normalization
-        x = x.permute(0, 3, 1, 2).contiguous().view(N, V * C, T)
         x = self.data_bn(x)
-        x = x.view(N, V, C, T).permute(0, 2, 3, 1).contiguous().view(N, C, 1, T * V)
+        if self.temporal_connection:
+            x = x.view(N, C, 1, T * V)  # N, C, 1, (T*V)
 
-        # forwad GCN
-        gcn_list = list(self.st_gcn_networks)
-        for i_gcn, gcn in enumerate(gcn_list):
-            x, _ = gcn(x, self.A)  # (N * M), C, 1, (T*V)
+        # forward GCN
+        for gcn in self.st_gcn_networks:
+            x, _ = gcn(x, self.A)  # N, C, 1, (T*V)
         x = x.view(N, -1, T, V)  # N, C, T ,V
 
         # Pooling 1
         x_res1 = x
         x = self.pool1(x)  # N, C, T, 5
 
-        x = x.view(N, -1, 1, T * len(self.graph.part))  # N, 512, 1, (T*5)
+        if self.temporal_connection:
+            x = x.view(N, -1, 1, T * len(self.graph.part))  # N, 512, 1, (T*5)
         x, _ = self.st_gcn_pool[0](x, self.A_pool)  # N, 512, 1, (T*5)
         x, _ = self.st_gcn_pool[1](x, self.A_pool)  # N, 512, 1, (T*5)
         x = x.view(N, -1, T, len(self.graph.part))  # N, C, T, 5

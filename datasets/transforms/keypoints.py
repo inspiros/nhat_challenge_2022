@@ -42,9 +42,12 @@ class WithMaskCompose(nn.Module):
 
 
 class WithMask(torch.nn.Module):
+    def __init__(self, value=0):
+        super(WithMask, self).__init__()
+        self.value = value
 
     def forward(self, x, mask=None):
-        out_mask = torch.ones_like(x)
+        out_mask = x.eq(self.value).type_as(x)
         if mask is not None:
             out_mask = out_mask * mask
         return x, out_mask

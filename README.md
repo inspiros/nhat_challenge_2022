@@ -2,7 +2,9 @@
 
 ### Introduction:
 
-You know the situation.
+~~You know the situation.~~ \
+
+**New update**: The winner will be announced shortly.
 
 ### Price: 1.000.000 VND
 

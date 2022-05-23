@@ -141,7 +141,7 @@ def main():
     model = BiLSTM(in_channels=2,
                    out_channels=2,
                    num_keypoints=17,
-                   num_layers=3,
+                   num_layers=2,
                    dropout=0.05,
                    )
     model.to(args.device)
